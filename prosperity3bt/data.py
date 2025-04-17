@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 
-from prosperity3bt.datamodel import Symbol, Trade
+from prosperity3bt.datamodel import ConversionObservation, Symbol, Trade
 from prosperity3bt.file_reader import FileReader
 
 LIMITS = {
@@ -22,6 +22,11 @@ LIMITS = {
     "MAGNIFICENT_MACARONS": 75,
 }
 
+
+@dataclass
+class ConversionObservationRow:
+    timestamp: int
+    conversion_observation: ConversionObservation
 
 @dataclass
 class PriceRow:
@@ -54,13 +59,18 @@ class BacktestData:
     round_num: int
     day_num: int
 
+    conversion_observations: dict[int, dict[Symbol, ConversionObservation]]
     prices: dict[int, dict[Symbol, PriceRow]]
     trades: dict[int, dict[Symbol, list[Trade]]]
     products: list[Symbol]
     profit_loss: dict[Symbol, float]
 
 
-def create_backtest_data(round_num: int, day_num: int, prices: list[PriceRow], trades: list[Trade]) -> BacktestData:
+def create_backtest_data(round_num: int, day_num: int, conversion_observations: list[ConversionObservationRow], prices: list[PriceRow], trades: list[Trade]) -> BacktestData:
+    conversion_observations_by_timestamp: dict[int, dict[Symbol, ConversionObservation]] = defaultdict(dict)
+    for row in conversion_observations:
+        conversion_observations_by_timestamp[row.timestamp]["MAGNIFICENT_MACARONS"] = row.conversion_observation
+
     prices_by_timestamp: dict[int, dict[Symbol, PriceRow]] = defaultdict(dict)
     for row in prices:
         prices_by_timestamp[row.timestamp][row.product] = row
@@ -75,6 +85,7 @@ def create_backtest_data(round_num: int, day_num: int, prices: list[PriceRow], t
     return BacktestData(
         round_num=round_num,
         day_num=day_num,
+        conversion_observations=conversion_observations_by_timestamp,
         prices=prices_by_timestamp,
         trades=trades_by_timestamp,
         products=products,
@@ -88,6 +99,29 @@ def has_day_data(file_reader: FileReader, round_num: int, day_num: int) -> bool:
 
 
 def read_day_data(file_reader: FileReader, round_num: int, day_num: int, no_names: bool) -> BacktestData:
+    conversion_observations = []
+    with file_reader.file([f"round{round_num}", f"observations_round_{round_num}_day_{day_num}.csv"]) as file:
+        if file is None:
+            raise ValueError(f"Observations data is not available for round {round_num} day {day_num}")
+
+        for line in file.read_text(encoding="utf-8").splitlines()[1:]:
+            columns = line.split(",")
+
+            conversion_observations.append(
+                ConversionObservationRow(
+                    timestamp=int(columns[0]),
+                    conversion_observation=ConversionObservation(
+                        bidPrice=float(columns[1]),
+                        askPrice=float(columns[2]),
+                        transportFees=float(columns[3]),
+                        exportTariff=float(columns[4]),
+                        importTariff=float(columns[5]),
+                        sugarPrice=float(columns[6]),
+                        sunlightIndex=float(columns[7]),
+                    )
+                )
+            )
+
     prices = []
     with file_reader.file([f"round{round_num}", f"prices_round_{round_num}_day_{day_num}.csv"]) as file:
         if file is None:
@@ -134,4 +168,4 @@ def read_day_data(file_reader: FileReader, round_num: int, day_num: int, no_name
 
             break
 
-    return create_backtest_data(round_num, day_num, prices, trades)
+    return create_backtest_data(round_num, day_num, conversion_observations, prices, trades)

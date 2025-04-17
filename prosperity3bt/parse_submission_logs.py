@@ -5,6 +5,14 @@ from pathlib import Path
 import orjson
 
 
+def parse_observations(observations_log: str, output_dir: Path, round_day: str) -> None:
+    output_file = output_dir / f"observations_{round_day}.csv"
+
+    print(f"Writing observations data to {output_file}")
+    with output_file.open("w+", encoding="utf-8") as f:
+        f.write(observations_log + "\n")
+
+
 def parse_prices(activities_log: str, output_dir: Path, round_day: str) -> None:
     output_file = output_dir / f"prices_{round_day}.csv"
 
@@ -79,6 +87,7 @@ def main() -> None:
 
     round_day = f"round_{args.round}_day_{args.day}"
 
+    parse_observations(sections["Observations"], output_dir, round_day)
     parse_prices(sections["Activities log"], output_dir, round_day)
     parse_trades(sections["Trade History"], output_dir, round_day)
 

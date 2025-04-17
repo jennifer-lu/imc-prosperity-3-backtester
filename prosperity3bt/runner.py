@@ -19,6 +19,8 @@ from prosperity3bt.models import (
 
 
 def prepare_state(state: TradingState, data: BacktestData) -> None:
+    state.observations.conversionObservations["MAGNIFICENT_MACARONS"] = data.conversion_observations[state.timestamp]["MAGNIFICENT_MACARONS"]
+
     for product in data.products:
         order_depth = OrderDepth()
         row = data.prices[state.timestamp][product]
